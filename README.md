@@ -223,13 +223,9 @@ To support other counties:
    ```
 4. Now, the tools can be invoked with `county="dallas"` (e.g., `search_properties(address="123 Main St", county="dallas")`).
 
-### 3. Concurrent County Access & Cache Collisions
+### 3. Concurrent County Access & Cache Isolation
 * **Concurrent Execution**: Yes, you can query multiple registered counties concurrently by passing the corresponding `county` parameter in separate tool calls.
-* **Cache Collision Warning**: 
-  > [!WARNING]
-  > The local SQLite cache (`socrata_cache.db`) currently uses the Socrata **domain** (e.g., `data.texas.gov`) as the key for namespaces. If you configure and query multiple counties that are hosted on the **same Socrata domain** (e.g., Collin County and Dallas County both on `data.texas.gov`), their lookup caches (Neighborhood codes and Taxing Entity rates) will collide and overwrite each other in the database.
-  > 
-  > **To run multiple counties on the same domain concurrently without collisions**, we would need to update the database schema in `database.py` and the lookup logic in `main.py` to namespace records by Socrata **`dataset_id`** (which is globally unique) instead of `domain`.
+* **Cache Isolation**: The local SQLite cache (`socrata_cache.db`) namespaces all lookup caches (Neighborhoods and Taxing Entities) using unique Socrata **`dataset_id`** values (which are globally unique). This guarantees that even if multiple configured counties share the exact same Socrata domain (e.g., Collin County and a future Dallas County both hosted on `data.texas.gov`), their lookup tables will remain isolated and will never collide or overwrite each other in the database.
 
 ---
 
