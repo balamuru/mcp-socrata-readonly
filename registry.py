@@ -8,6 +8,12 @@ COUNTY_REGISTRY: Dict[str, Dict[str, str]] = {
         "appraisal_dataset": "vffy-snc6",  # Collin CAD Appraisal Data - 2025
         "neighborhood_dataset": "uem9-5zfv", # Collin CAD Neighborhood List
         "entity_dataset": "rwqz-r4mp",     # Collin CAD Entity List - Current Year
+    },
+    "collin_test": {
+        "domain": "data.texas.gov",
+        "appraisal_dataset": "vffy-snc6",
+        "neighborhood_dataset": "test-nbhd",
+        "entity_dataset": "test-enti",
     }
 }
 

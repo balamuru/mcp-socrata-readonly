@@ -16,27 +16,31 @@ client = SocrataClient()
 geo = Geocoder()
 
 def _ensure_cache(domain: str, reg: Dict[str, str]):
-    if not database.is_cache_valid(domain, "neighborhoods"):
-        logger.info("Rebuilding neighborhood cache...")
-        records = client.fetch_all(domain, reg["neighborhood_dataset"])
-        database.update_cache(domain, "neighborhoods", records, database.insert_neighborhoods)
-    if not database.is_cache_valid(domain, "entities"):
-        logger.info("Rebuilding entities cache...")
-        records = client.fetch_all(domain, reg["entity_dataset"])
-        database.update_cache(domain, "entities", records, database.insert_entities)
+    nbhd_dataset = reg["neighborhood_dataset"]
+    entity_dataset = reg["entity_dataset"]
+    
+    if not database.is_cache_valid(nbhd_dataset, "neighborhoods"):
+        logger.info(f"Rebuilding neighborhood cache for dataset {nbhd_dataset}...")
+        records = client.fetch_all(domain, nbhd_dataset)
+        database.update_cache(nbhd_dataset, "neighborhoods", records, database.insert_neighborhoods)
+        
+    if not database.is_cache_valid(entity_dataset, "entities"):
+        logger.info(f"Rebuilding entities cache for dataset {entity_dataset}...")
+        records = client.fetch_all(domain, entity_dataset)
+        database.update_cache(entity_dataset, "entities", records, database.insert_entities)
 
-def _format_property(domain: str, prop: Dict[str, Any]) -> Dict[str, Any]:
+def _format_property(reg: Dict[str, str], prop: Dict[str, Any]) -> Dict[str, Any]:
     """Helper to join codes and format a property record."""
     formatted = dict(prop)
     
     # Neighborhood lookup
     if "nbhdcode" in prop:
-        formatted["neighborhood_name"] = database.get_cached_neighborhood(domain, prop["nbhdcode"])
+        formatted["neighborhood_name"] = database.get_cached_neighborhood(reg["neighborhood_dataset"], prop["nbhdcode"])
         
     # Entity lookup (entitycodes is often a comma-separated string)
     if "entitycodes" in prop and prop["entitycodes"]:
         codes = [c.strip() for c in str(prop["entitycodes"]).split(",")]
-        resolved = [database.get_cached_entity(domain, c) for c in codes]
+        resolved = [database.get_cached_entity(reg["entity_dataset"], c) for c in codes]
         formatted["taxing_entities"] = resolved
     
     return formatted
@@ -66,7 +70,7 @@ def search_properties(address: Optional[str] = None, owner: Optional[str] = None
     
     try:
         records = client.fetch_page(domain, reg["appraisal_dataset"], limit=limit, where=where_query)
-        formatted_records = [_format_property(domain, r) for r in records]
+        formatted_records = [_format_property(reg, r) for r in records]
         return json.dumps(formatted_records, indent=2)
     except Exception as e:
         return json.dumps({"error": str(e)})
@@ -85,7 +89,7 @@ def get_property_detail(property_id: str, county: str = "collin") -> str:
         if not records:
             return json.dumps({"error": f"Property ID {property_id} not found."})
             
-        formatted = _format_property(domain, records[0])
+        formatted = _format_property(reg, records[0])
         return json.dumps(formatted, indent=2)
     except Exception as e:
         return json.dumps({"error": str(e)})

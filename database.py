@@ -16,43 +16,56 @@ def init_db():
     with get_connection() as conn:
         cursor = conn.cursor()
         
+        # Migrating old schema if needed (checking if old 'domain' column exists)
+        try:
+            cursor.execute("SELECT domain FROM metadata LIMIT 1")
+            # If the above line runs without raising OperationalError, we have the old schema.
+            # Drop old tables to migrate to dataset_id schema.
+            logger.info("Migrating SQLite cache schema from domain key to dataset_id key...")
+            cursor.execute("DROP TABLE IF EXISTS metadata")
+            cursor.execute("DROP TABLE IF EXISTS neighborhoods")
+            cursor.execute("DROP TABLE IF EXISTS entities")
+        except sqlite3.OperationalError:
+            # Table doesn't exist or is already migrated (no domain column)
+            pass
+            
         # Metadata table to track cache expiration
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS metadata (
-                domain TEXT,
+                dataset_id TEXT,
                 table_name TEXT,
                 last_updated INTEGER,
-                PRIMARY KEY (domain, table_name)
+                PRIMARY KEY (dataset_id, table_name)
             )
         ''')
         
         # Neighborhoods table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS neighborhoods (
-                domain TEXT,
+                dataset_id TEXT,
                 neighborhood_code TEXT,
                 neighborhood_description TEXT,
-                PRIMARY KEY (domain, neighborhood_code)
+                PRIMARY KEY (dataset_id, neighborhood_code)
             )
         ''')
         
         # Tax Entities table
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS entities (
-                domain TEXT,
+                dataset_id TEXT,
                 entity_code TEXT,
                 entity_description TEXT,
                 tax_rate REAL,
-                PRIMARY KEY (domain, entity_code)
+                PRIMARY KEY (dataset_id, entity_code)
             )
         ''')
         conn.commit()
 
-def is_cache_valid(domain: str, table_name: str) -> bool:
+def is_cache_valid(dataset_id: str, table_name: str) -> bool:
     """Check if the cache for a specific table is still valid based on TTL."""
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute('SELECT last_updated FROM metadata WHERE domain = ? AND table_name = ?', (domain, table_name))
+        cursor.execute('SELECT last_updated FROM metadata WHERE dataset_id = ? AND table_name = ?', (dataset_id, table_name))
         row = cursor.fetchone()
         
         if not row:
@@ -64,44 +77,44 @@ def is_cache_valid(domain: str, table_name: str) -> bool:
         
         return age_seconds < ttl_seconds
 
-def update_cache(domain: str, table_name: str, records: List[Dict[str, Any]], insert_func: Callable[[sqlite3.Cursor, str, List[Dict[str, Any]]], None]):
+def update_cache(dataset_id: str, table_name: str, records: List[Dict[str, Any]], insert_func: Callable[[sqlite3.Cursor, str, List[Dict[str, Any]]], None]):
     """Atomically update a cache table within a transaction."""
     with get_connection() as conn:
         cursor = conn.cursor()
         try:
             # Clear old records
-            cursor.execute(f"DELETE FROM {table_name} WHERE domain = ?", (domain,))
+            cursor.execute(f"DELETE FROM {table_name} WHERE dataset_id = ?", (dataset_id,))
             
             # Insert new records using the provided mapping function
-            insert_func(cursor, domain, records)
+            insert_func(cursor, dataset_id, records)
             
             # Update metadata
             now = int(time.time())
             cursor.execute('''
-                INSERT INTO metadata (domain, table_name, last_updated)
+                INSERT INTO metadata (dataset_id, table_name, last_updated)
                 VALUES (?, ?, ?)
-                ON CONFLICT(domain, table_name) DO UPDATE SET last_updated = excluded.last_updated
-            ''', (domain, table_name, now))
+                ON CONFLICT(dataset_id, table_name) DO UPDATE SET last_updated = excluded.last_updated
+            ''', (dataset_id, table_name, now))
             
             conn.commit()
-            logger.info(f"Successfully updated SQLite cache for {domain}.{table_name}")
+            logger.info(f"Successfully updated SQLite cache for {dataset_id}.{table_name}")
         except Exception as e:
             conn.rollback()
             logger.error(f"Failed to update cache for {table_name}: {e}")
             raise
 
-def insert_neighborhoods(cursor: sqlite3.Cursor, domain: str, records: List[Dict[str, Any]]):
+def insert_neighborhoods(cursor: sqlite3.Cursor, dataset_id: str, records: List[Dict[str, Any]]):
     """Mapping function for neighborhoods."""
     for r in records:
         code = r.get("nbhdcode")
         desc = r.get("nbhdname", "Unknown")
         if code:
             cursor.execute('''
-                INSERT OR REPLACE INTO neighborhoods (domain, neighborhood_code, neighborhood_description)
+                INSERT OR REPLACE INTO neighborhoods (dataset_id, neighborhood_code, neighborhood_description)
                 VALUES (?, ?, ?)
-            ''', (domain, code, desc))
+            ''', (dataset_id, code, desc))
 
-def insert_entities(cursor: sqlite3.Cursor, domain: str, records: List[Dict[str, Any]]):
+def insert_entities(cursor: sqlite3.Cursor, dataset_id: str, records: List[Dict[str, Any]]):
     """Mapping function for taxing entities."""
     for r in records:
         code = r.get("entitycode")
@@ -115,21 +128,21 @@ def insert_entities(cursor: sqlite3.Cursor, domain: str, records: List[Dict[str,
             
         if code:
             cursor.execute('''
-                INSERT OR REPLACE INTO entities (domain, entity_code, entity_description, tax_rate)
+                INSERT OR REPLACE INTO entities (dataset_id, entity_code, entity_description, tax_rate)
                 VALUES (?, ?, ?, ?)
-            ''', (domain, code, desc, rate))
+            ''', (dataset_id, code, desc, rate))
 
-def get_cached_neighborhood(domain: str, code: str) -> str:
+def get_cached_neighborhood(dataset_id: str, code: str) -> str:
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute('SELECT neighborhood_description FROM neighborhoods WHERE domain = ? AND neighborhood_code = ?', (domain, code))
+        cursor.execute('SELECT neighborhood_description FROM neighborhoods WHERE dataset_id = ? AND neighborhood_code = ?', (dataset_id, code))
         row = cursor.fetchone()
         return row['neighborhood_description'] if row else code
 
-def get_cached_entity(domain: str, code: str) -> Dict[str, Any]:
+def get_cached_entity(dataset_id: str, code: str) -> Dict[str, Any]:
     with get_connection() as conn:
         cursor = conn.cursor()
-        cursor.execute('SELECT entity_description, tax_rate FROM entities WHERE domain = ? AND entity_code = ?', (domain, code))
+        cursor.execute('SELECT entity_description, tax_rate FROM entities WHERE dataset_id = ? AND entity_code = ?', (dataset_id, code))
         row = cursor.fetchone()
         if row:
             return {"name": row['entity_description'], "rate": row['tax_rate']}
