@@ -72,6 +72,11 @@ To set them in your client config (e.g., `claude_desktop_config.json`):
 }
 ```
 
+> [!IMPORTANT]
+> **Configuration Precedence & Subprocess Behavior:**
+> - **For Embedded Mode (Claude Desktop, Cursor, etc.):** You should configure variables inside the client's JSON configuration `"env"` block. Because these host clients launch the server from arbitrary home/system working directories, the server's automatic `.env` loader will not find the project-root `.env` file.
+> - **For Standalone Mode (SSE) & Development:** A local `.env` file at the root of the project works perfectly, as the server is started directly from the project working directory.
+
 ---
 
 ## 🚀 Usage Modes
