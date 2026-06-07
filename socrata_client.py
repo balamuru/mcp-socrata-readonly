@@ -3,12 +3,13 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import logging
 from typing import List, Dict, Any, Optional
+from config import SOCRATA_APP_TOKEN
 
 logger = logging.getLogger("socrata-mcp.client")
 
 class SocrataClient:
     def __init__(self, app_token: Optional[str] = None):
-        self.app_token = app_token
+        self.app_token = app_token or SOCRATA_APP_TOKEN
         self.session = self._build_session()
         
     def _build_session(self) -> requests.Session:
