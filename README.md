@@ -203,6 +203,36 @@ To publish the package so that others can install it via `pip install mcp-socrat
 
 ---
 
+## 🗺 Multi-County Support & Caching Behavior
+
+### 1. Collin County Specificity
+This MCP server is pre-configured out-of-the-box for **Collin County, TX** (appraisal data, neighborhoods, and tax entities hosted on `data.texas.gov`).
+
+### 2. How to Support Other Counties
+To support other counties:
+1. Locate the county's appraisal, neighborhood, and entity datasets on Socrata (e.g., Dallas County CAD or Travis County CAD on `data.texas.gov` or a separate portal).
+2. Note their Socrata domain (e.g. `data.texas.gov`) and unique 9-character dataset IDs (e.g., `vffy-snc6`).
+3. Add the new county configuration to the registry dictionary `COUNTY_REGISTRY` in `registry.py`:
+   ```python
+   "dallas": {
+       "domain": "data.texas.gov",
+       "appraisal_dataset": "xxxx-xxxx",
+       "neighborhood_dataset": "yyyy-yyyy",
+       "entity_dataset": "zzzz-zzzz",
+   }
+   ```
+4. Now, the tools can be invoked with `county="dallas"` (e.g., `search_properties(address="123 Main St", county="dallas")`).
+
+### 3. Concurrent County Access & Cache Collisions
+* **Concurrent Execution**: Yes, you can query multiple registered counties concurrently by passing the corresponding `county` parameter in separate tool calls.
+* **Cache Collision Warning**: 
+  > [!WARNING]
+  > The local SQLite cache (`socrata_cache.db`) currently uses the Socrata **domain** (e.g., `data.texas.gov`) as the key for namespaces. If you configure and query multiple counties that are hosted on the **same Socrata domain** (e.g., Collin County and Dallas County both on `data.texas.gov`), their lookup caches (Neighborhood codes and Taxing Entity rates) will collide and overwrite each other in the database.
+  > 
+  > **To run multiple counties on the same domain concurrently without collisions**, we would need to update the database schema in `database.py` and the lookup logic in `main.py` to namespace records by Socrata **`dataset_id`** (which is globally unique) instead of `domain`.
+
+---
+
 ## Architecture Notes
 * **Data Fetching:** SODA pagination limits are cleanly handled up to 50,000 records per page. `urllib3` retry logic protects against Socrata `429` (Rate Limit) and `500` HTTP exceptions.
 * **Geocoding:** Defaults to the **US Census Geocoder** API. OpenStreetMap Nominatim is notoriously strict with blocking cloud datacenter IPs (403 Forbidden errors). The Census API requires no keys and handles cloud traffic gracefully.
