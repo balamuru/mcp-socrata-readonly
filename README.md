@@ -162,6 +162,47 @@ venv/bin/python -m unittest discover -s tests
 
 ---
 
+## 📦 Packaging & Distribution
+
+This server is fully configured as a standard Python package using `pyproject.toml`. It exposes a global console script `mcp-socrata` so it can be installed and run easily.
+
+### Option A: Install Directly from GitHub
+Others can install the server directly from GitHub without publishing to PyPI first:
+```bash
+pip install git+https://github.com/balamuru/mcp-socrata-readonly.git
+```
+Then configure it in the client config (e.g., `claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "socrata-real-estate": {
+      "command": "mcp-socrata",
+      "env": {
+        "SOCRATA_APP_TOKEN": "YOUR_SOCRATA_APP_TOKEN"
+      }
+    }
+  }
+}
+```
+
+### Option B: Build and Publish to PyPI
+To publish the package so that others can install it via `pip install mcp-socrata-readonly`:
+
+1. Install build tools:
+   ```bash
+   pip install --upgrade build twine
+   ```
+2. Build the package wheel and tarball:
+   ```bash
+   python -m build
+   ```
+3. Upload the package to PyPI (requires PyPI credentials):
+   ```bash
+   python -m twine upload dist/*
+   ```
+
+---
+
 ## Architecture Notes
 * **Data Fetching:** SODA pagination limits are cleanly handled up to 50,000 records per page. `urllib3` retry logic protects against Socrata `429` (Rate Limit) and `500` HTTP exceptions.
 * **Geocoding:** Defaults to the **US Census Geocoder** API. OpenStreetMap Nominatim is notoriously strict with blocking cloud datacenter IPs (403 Forbidden errors). The Census API requires no keys and handles cloud traffic gracefully.
