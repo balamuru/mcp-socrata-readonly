@@ -84,6 +84,38 @@ venv/bin/fastmcp dev main:mcp
 
 ---
 
+## 🏗 Architecture & Data Flow
+
+```mermaid
+flowchart TD
+    User([User Prompt]) --> |Query properties / tax info| Client[AI Client / LLM]
+    Client --> |MCP Tool Call| Server[MCP Server / fastmcp]
+
+    subgraph Server [Real Estate MCP Server]
+        Tools[MCP Tools: search_properties, get_property_detail, query_properties_near, ...]
+        
+        subgraph Logic [Execution Logic]
+            GeocoderClient[US Census Geocoder Client]
+            SODAClient[Socrata SODA Client]
+            DB[(Local SQLite Cache: socrata_cache.db)]
+            Resolver[Relational Join & Code Resolver]
+        end
+    end
+
+    %% External Connections
+    GeocoderClient <--> |Geocode Address| Census[US Census Geocoding API]
+    SODAClient <--> |SoQL Queries / Fetch Records| SODA_API[Socrata SODA API (data.texas.gov)]
+    
+    %% Internal Flow
+    Tools --> GeocoderClient
+    Tools --> SODAClient
+    SODAClient --> Resolver
+    DB --> |Lookup Neighborhood & Tax Rates| Resolver
+    Resolver --> |Enriched Human-Readable JSON| Client
+```
+
+---
+
 ## Architecture Notes
 * **Data Fetching:** SODA pagination limits are cleanly handled up to 50,000 records per page. `urllib3` retry logic protects against Socrata `429` (Rate Limit) and `500` HTTP exceptions.
 * **Geocoding:** Defaults to the **US Census Geocoder** API. OpenStreetMap Nominatim is notoriously strict with blocking cloud datacenter IPs (403 Forbidden errors). The Census API requires no keys and handles cloud traffic gracefully.
