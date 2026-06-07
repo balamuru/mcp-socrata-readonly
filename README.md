@@ -33,7 +33,7 @@ Unlike generic Socrata MCP servers or direct REST API integrations, this server 
 
 1. Navigate to the project directory:
    ```bash
-   cd /home/vinayb/CodeProjects/mcp-socrata-readonly
+   cd /path/to/mcp-socrata-readonly
    ```
 2. Create the Python virtual environment:
    ```bash
@@ -43,6 +43,34 @@ Unlike generic Socrata MCP servers or direct REST API integrations, this server 
    ```bash
    venv/bin/pip install -r requirements.txt
    ```
+
+---
+
+## ⚙️ Configuration
+
+The server can be configured using environment variables. You can set these in your shell, define them in a `.env` file in the project root, or include them directly in your MCP client configuration:
+
+| Environment Variable | Description | Default / Fallback |
+| :--- | :--- | :--- |
+| `SOCRATA_APP_TOKEN` | Optional. Your Socrata App Token to bypass public API rate limits (highly recommended for production). | `None` (Public access) |
+| `USER_AGENT_EMAIL` | Optional. Email sent in the User-Agent header (required/polite for Nominatim fallbacks or other APIs). | `socrata_mcp_default@example.com` |
+| `CACHE_TTL_DAYS` | Optional. The number of days before the local SQLite cache is considered expired. | `7` |
+
+To set them in your client config (e.g., `claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "socrata-real-estate": {
+      "command": "/path/to/mcp-socrata-readonly/venv/bin/fastmcp",
+      "args": ["run", "/path/to/mcp-socrata-readonly/main.py"],
+      "env": {
+        "SOCRATA_APP_TOKEN": "YOUR_SOCRATA_APP_TOKEN_HERE",
+        "USER_AGENT_EMAIL": "your-email@example.com"
+      }
+    }
+  }
+}
+```
 
 ---
 
@@ -58,8 +86,8 @@ In embedded mode, the server communicates with your AI client (like Claude Deskt
 {
   "mcpServers": {
     "socrata-real-estate": {
-      "command": "/home/vinayb/CodeProjects/mcp-socrata-readonly/venv/bin/fastmcp",
-      "args": ["run", "/home/vinayb/CodeProjects/mcp-socrata-readonly/main.py"]
+      "command": "/path/to/mcp-socrata-readonly/venv/bin/fastmcp",
+      "args": ["run", "/path/to/mcp-socrata-readonly/main.py"]
     }
   }
 }
