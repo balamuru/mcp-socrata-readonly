@@ -116,6 +116,16 @@ flowchart TD
 
 ---
 
+## 🧪 Running Tests
+
+A complete suite of integration tests is located in the `tests/` directory. You can run all tests using Python's built-in `unittest` module:
+
+```bash
+venv/bin/python -m unittest discover -s tests
+```
+
+---
+
 ## Architecture Notes
 * **Data Fetching:** SODA pagination limits are cleanly handled up to 50,000 records per page. `urllib3` retry logic protects against Socrata `429` (Rate Limit) and `500` HTTP exceptions.
 * **Geocoding:** Defaults to the **US Census Geocoder** API. OpenStreetMap Nominatim is notoriously strict with blocking cloud datacenter IPs (403 Forbidden errors). The Census API requires no keys and handles cloud traffic gracefully.
