@@ -48,7 +48,15 @@ Unlike generic Socrata MCP servers or direct REST API integrations, this server 
 
 ## ⚙️ Configuration
 
-The server can be configured using environment variables. You can set these in your shell, define them in a `.env` file in the project root, or include them directly in your MCP client configuration:
+The server is configured using environment variables. You can specify these variables in one of two ways:
+
+1. **MCP Client Config File (`config.json` / `claude_desktop_config.json`)**: **Required for Embedded Mode** (e.g., Claude Desktop, Cursor). Because these host clients spawn the MCP server subprocess from arbitrary system or home working directories, the server's automatic `.env` loader will not locate a project-root `.env` file. Specifying configuration variables directly in the JSON's `env` section ensures they are passed correctly.
+2. **Local `.env` File**: **Recommended for Standalone Mode (SSE) and Development**. When running the server from the project directory, you can copy the template provided to create a local `.env` file:
+   ```bash
+   cp env.template .env
+   ```
+
+### Configuration Variables
 
 | Environment Variable | Description | Default / Fallback |
 | :--- | :--- | :--- |
@@ -56,7 +64,7 @@ The server can be configured using environment variables. You can set these in y
 | `USER_AGENT_EMAIL` | Optional. Email sent in the User-Agent header (required/polite for Nominatim fallbacks or other APIs). | `socrata_mcp_default@example.com` |
 | `CACHE_TTL_DAYS` | Optional. The number of days before the local SQLite cache is considered expired. | `7` |
 
-To set them in your client config (e.g., `claude_desktop_config.json`):
+### Client Configuration Example (e.g., `claude_desktop_config.json`):
 ```json
 {
   "mcpServers": {
@@ -71,11 +79,6 @@ To set them in your client config (e.g., `claude_desktop_config.json`):
   }
 }
 ```
-
-> [!IMPORTANT]
-> **Configuration Precedence & Subprocess Behavior:**
-> - **For Embedded Mode (Claude Desktop, Cursor, etc.):** You should configure variables inside the client's JSON configuration `"env"` block. Because these host clients launch the server from arbitrary home/system working directories, the server's automatic `.env` loader will not find the project-root `.env` file.
-> - **For Standalone Mode (SSE) & Development:** A local `.env` file at the root of the project works perfectly, as the server is started directly from the project working directory.
 
 ---
 
@@ -121,23 +124,23 @@ venv/bin/fastmcp dev main:mcp
 
 ```mermaid
 flowchart TD
-    User([User Prompt]) --> |Query properties / tax info| Client[AI Client / LLM]
-    Client --> |MCP Tool Call| Server[MCP Server / fastmcp]
+    User(["User Prompt"]) --> |Query properties / tax info| Client["AI Client / LLM"]
+    Client --> |MCP Tool Call| Server["Real Estate MCP Server"]
 
-    subgraph Server [Real Estate MCP Server]
-        Tools[MCP Tools: search_properties, get_property_detail, query_properties_near, ...]
+    subgraph Server ["Real Estate MCP Server"]
+        Tools["MCP Tools: search_properties, get_property_detail, query_properties_near, ..."]
         
-        subgraph Logic [Execution Logic]
-            GeocoderClient[US Census Geocoder Client]
-            SODAClient[Socrata SODA Client]
-            DB[(Local SQLite Cache: socrata_cache.db)]
-            Resolver[Relational Join & Code Resolver]
+        subgraph Logic ["Execution Logic"]
+            GeocoderClient["US Census Geocoder Client"]
+            SODAClient["Socrata SODA Client"]
+            DB[("Local SQLite Cache: socrata_cache.db")]
+            Resolver["Relational Join & Code Resolver"]
         end
     end
 
     %% External Connections
-    GeocoderClient <--> |Geocode Address| Census[US Census Geocoding API]
-    SODAClient <--> |SoQL Queries / Fetch Records| SODA_API[Socrata SODA API (data.texas.gov)]
+    GeocoderClient <--> |Geocode Address| Census["US Census Geocoding API"]
+    SODAClient <--> |SoQL Queries / Fetch Records| SODA_API["Socrata SODA API (data.texas.gov)"]
     
     %% Internal Flow
     Tools --> GeocoderClient
