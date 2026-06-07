@@ -137,6 +137,9 @@ def refresh_cache(county: str = "collin") -> str:
     except Exception as e:
         return json.dumps({"error": str(e)})
 
-if __name__ == "__main__":
+def run():
     # Allows the server to run over stdio (compatible with Claude Code/Desktop)
     mcp.run(transport='stdio')
+
+if __name__ == "__main__":
+    run()

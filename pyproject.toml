@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcp-socrata-readonly"
+version = "0.1.0"
+description = "A high-performance Model Context Protocol (MCP) server for Socrata real estate appraisal data"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "Apache-2.0"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "fastmcp>=0.1.0",
+    "requests>=2.0.0",
+    "urllib3>=2.0.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/balamuru/mcp-socrata-readonly"
+
+[project.scripts]
+mcp-socrata = "main:run"
+
+[tool.setuptools]
+py-modules = ["main", "socrata_client", "database", "geocoder", "registry", "config"]
