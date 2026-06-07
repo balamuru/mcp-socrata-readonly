@@ -16,11 +16,24 @@ The server exposes five AI-ready MCP tools:
 
 ---
 
+## 🎯 Gap Analysis: What This Server Solves
+
+Unlike generic Socrata MCP servers or direct REST API integrations, this server is specifically engineered to overcome the structural, relational, and geospatial limitations of open data portals:
+
+| Feature / Gap | Raw Socrata API | Standard MCP Servers | This Real Estate MCP Server |
+| :--- | :--- | :--- | :--- |
+| **Relational Joins (`JOIN`)** | **None.** HTTP SODA has no relational join syntax over REST. | **None.** Standard MCPs can only query one dataset/table at a time. | **Resolved Locally.** Downloads and caches lookup tables (Neighborhoods, Taxing Entities) in a local SQLite database for instant, zero-latency joining. |
+| **Geospatial Resolution** | Needs pre-computed coordinates (`lat`/`lon`) for queries like `within_circle`. | Cannot resolve addresses or locations to coordinates. | **Integrated Geocoder.** Resolves standard street addresses to GPS coordinates using the US Census Geocoding API (preventing cloud-IP rate-limiting/blocking). |
+| **Code Translation** | Returns raw internal codes (e.g., Neighborhood `1001` or Tax Entity `GCO`). | Returns raw codes directly to the LLM, consuming context and reasoning. | **Human-Readable Outputs.** Translates abstract codes into actual entity names and adjustment values before presenting results to the LLM. |
+| **Token Limit Overflow** | Returns raw JSON payloads that can exceed 100MB+ for large queries. | Dumps massive raw JSON payloads directly into the prompt context, causing crashes. | **Intelligent Payload Control.** Cleans and structures data, returning concise summaries and resolving relational fields to keep tokens low. |
+
+---
+
 ## 🛠 Installation
 
 1. Navigate to the project directory:
    ```bash
-   cd /home/vinayb/CodeProjects/mcp-socrate-readonly
+   cd /home/vinayb/CodeProjects/mcp-socrata-readonly
    ```
 2. Create the Python virtual environment:
    ```bash
@@ -45,8 +58,8 @@ In embedded mode, the server communicates with your AI client (like Claude Deskt
 {
   "mcpServers": {
     "socrata-real-estate": {
-      "command": "/home/vinayb/CodeProjects/mcp-socrate-readonly/venv/bin/fastmcp",
-      "args": ["run", "/home/vinayb/CodeProjects/mcp-socrate-readonly/main.py"]
+      "command": "/home/vinayb/CodeProjects/mcp-socrata-readonly/venv/bin/fastmcp",
+      "args": ["run", "/home/vinayb/CodeProjects/mcp-socrata-readonly/main.py"]
     }
   }
 }
