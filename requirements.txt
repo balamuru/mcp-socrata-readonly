@@ -1,0 +1,4 @@
+fastmcp
+requests
+urllib3
+pydantic
