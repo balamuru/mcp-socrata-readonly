@@ -91,42 +91,36 @@ The server is configured using environment variables. You can specify these vari
 
 ### Claude Code Configuration:
 
-For **Claude Code**, you can configure MCP servers globally via `~/.claude.json` or project-specifically in `.claude/settings.json` (at the root of your project). 
+For **Claude Code**, MCP servers are configured via the CLI using one of three scopes:
 
-The most robust and recommended way is to use the Claude Code CLI command to add the server:
+| Scope | Flag | Stored In | Visibility |
+| :--- | :--- | :--- | :--- |
+| Local (default) | `--scope local` | `~/.claude.json` (project-keyed) | You only, this project |
+| User | `--scope user` | `~/.claude.json` (top-level) | You only, all projects |
+| Project | `--scope project` | `.mcp.json` in project root | Everyone who clones the repo |
+
+> [!NOTE]
+> `mcpServers` in `.claude/settings.json` is **not** a valid MCP configuration location for Claude Code. That file is only for general settings (permissions, hooks, etc.). Always use `claude mcp add` or `.mcp.json`.
+
+The recommended way is to use the Claude Code CLI (credentials stay private in `~/.claude.json`):
 
 ```bash
-claude mcp add-json socrata-real-estate '{
-  "command": "/path/to/mcp-socrata-readonly/venv/bin/fastmcp",
-  "args": ["run", "/path/to/mcp-socrata-readonly/main.py"],
-  "env": {
-    "SOCRATA_APP_TOKEN": "YOUR_SOCRATA_APP_TOKEN_HERE",
-    "SOCRATA_KEY_ID": "YOUR_API_KEY_ID_HERE",
-    "SOCRATA_KEY_SECRET": "YOUR_API_KEY_SECRET_HERE",
-    "USER_AGENT_EMAIL": "your-email@example.com"
-  }
-}'
+claude mcp add --scope local \
+  -e SOCRATA_APP_TOKEN=YOUR_SOCRATA_APP_TOKEN_HERE \
+  -e SOCRATA_KEY_ID=YOUR_API_KEY_ID_HERE \
+  -e SOCRATA_KEY_SECRET=YOUR_API_KEY_SECRET_HERE \
+  -e USER_AGENT_EMAIL=your-email@example.com \
+  socrata-real-estate \
+  /path/to/mcp-socrata-readonly/venv/bin/fastmcp \
+  run /path/to/mcp-socrata-readonly/main.py
 ```
 
-Alternatively, you can manually add this configuration:
-* **Global User Scope**: Add to `~/.claude.json` (create the file in your home directory if it does not exist).
-* **Project Scope**: Add to `.claude/settings.json` (located at the root of your project directory) inside the `"mcpServers"` object.
+To share the server config with your team (without credentials), use `--scope project`, which writes to `.mcp.json` in the project root — commit that file and let each developer supply their own credentials via `.env` or `claude mcp add --scope local`.
 
-```json
-{
-  "mcpServers": {
-    "socrata-real-estate": {
-      "command": "/path/to/mcp-socrata-readonly/venv/bin/fastmcp",
-      "args": ["run", "/path/to/mcp-socrata-readonly/main.py"],
-      "env": {
-        "SOCRATA_APP_TOKEN": "YOUR_SOCRATA_APP_TOKEN_HERE",
-        "SOCRATA_KEY_ID": "YOUR_API_KEY_ID_HERE",
-        "SOCRATA_KEY_SECRET": "YOUR_API_KEY_SECRET_HERE",
-        "USER_AGENT_EMAIL": "your-email@example.com"
-      }
-    }
-  }
-}
+You can verify the server is connected with:
+```bash
+claude mcp list
+```
 ```
 
 ---
@@ -153,24 +147,13 @@ In embedded mode, the server communicates with your AI client (like Claude Deskt
 
 **Configuration for Claude Code:**
 
-Add this configuration using the CLI command:
+Add this configuration using the CLI command (see [Claude Code Configuration](#claude-code-configuration) for scope options):
 ```bash
-claude mcp add-json socrata-real-estate '{
-  "command": "/path/to/mcp-socrata-readonly/venv/bin/fastmcp",
-  "args": ["run", "/path/to/mcp-socrata-readonly/main.py"]
-}'
+claude mcp add --scope local \
+  socrata-real-estate \
+  /path/to/mcp-socrata-readonly/venv/bin/fastmcp \
+  run /path/to/mcp-socrata-readonly/main.py
 ```
-
-Or manually add to `~/.claude.json` (User Scope) or `.claude/settings.json` (Project Scope):
-```json
-{
-  "mcpServers": {
-    "socrata-real-estate": {
-      "command": "/path/to/mcp-socrata-readonly/venv/bin/fastmcp",
-      "args": ["run", "/path/to/mcp-socrata-readonly/main.py"]
-    }
-  }
-}
 ```
 
 ### 2. Standalone Mode (SSE / HTTP)
