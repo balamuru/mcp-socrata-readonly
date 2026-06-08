@@ -1,6 +1,6 @@
 import unittest
 import json
-from main import search_properties, get_property_detail, discover_county_datasets, list_supported_locations
+from main import search_properties, get_property_detail, discover_county_datasets, list_supported_locations, comp_investigator
 
 class TestMCPApi(unittest.TestCase):
     def test_discover_county_datasets(self):
@@ -71,6 +71,49 @@ class TestMCPApi(unittest.TestCase):
     def test_list_supported_locations_invalid_county_returns_error(self):
         result = json.loads(list_supported_locations(county="atlantis"))
         self.assertIn("error", result)
+
+    # --- comp_investigator ---
+
+    def test_comp_investigator_invalid_propid_returns_error(self):
+        result = json.loads(comp_investigator("INVALID-PROPID-9999"))
+        self.assertIn("error", result)
+
+    def test_comp_investigator_invalid_county_returns_error(self):
+        result = json.loads(comp_investigator("2696948", county="atlantis"))
+        self.assertIn("error", result)
+
+    def test_comp_investigator_returns_valid_determination(self):
+        # 2696948 = Maddireddi Cypress Meadows (Allen, +2.87% in 2025)
+        result = json.loads(comp_investigator("2696948"))
+        valid_determinations = {"warranted", "not_warranted", "insufficient_data", "no_increase"}
+        self.assertIn("determination", result)
+        self.assertIn(result["determination"], valid_determinations)
+        self.assertIn("subject", result)
+        self.assertIn("determination_reason", result)
+        subj = result["subject"]
+        self.assertIn("propid", subj)
+        self.assertIn("address", subj)
+        self.assertIn("yoy_change_pct", subj)
+
+    def test_comp_investigator_structure_when_comps_found(self):
+        result = json.loads(comp_investigator("2696948"))
+        det = result.get("determination")
+        if det in ("warranted", "not_warranted"):
+            self.assertIn("comps_count", result)
+            self.assertGreater(result["comps_count"], 0)
+            self.assertIn("comps_summary", result)
+            cs = result["comps_summary"]
+            self.assertIn("median_yoy_pct", cs)
+            self.assertIn("comps", cs)
+            self.assertIsInstance(cs["comps"], list)
+
+    def test_comp_investigator_evidence_doc_only_when_not_warranted(self):
+        result = json.loads(comp_investigator("2696948"))
+        if result.get("determination") == "not_warranted":
+            self.assertIn("evidence_document", result)
+            self.assertIn("# Property Tax Protest Evidence Package", result["evidence_document"])
+        else:
+            self.assertNotIn("evidence_document", result)
 
 if __name__ == "__main__":
     unittest.main()

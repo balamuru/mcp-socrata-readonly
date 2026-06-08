@@ -5,6 +5,7 @@ from geocoder import Geocoder
 from registry import get_registry, list_states, list_counties
 import database
 import json
+import statistics
 from config import logger
 import logging
 
@@ -102,6 +103,183 @@ def _build_owner_where(owner: str) -> str:
     clauses.append("(" + " AND ".join(token_clauses) + ")")
 
     return "(" + " OR ".join(clauses) + ")"
+
+def _comp_stats(comps_raw: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Compute YoY market-value change statistics across a list of comparable property records."""
+    yoy_pcts: List[float] = []
+    comp_details: List[Dict[str, Any]] = []
+    for c in comps_raw:
+        try:
+            prev = float(c.get("prevvalmarket", 0) or 0)
+            curr = float(c.get("currvalmarket", 0) or 0)
+            if prev <= 0 or curr <= 0:
+                continue
+            yoy = (curr - prev) / prev * 100
+            yoy_pcts.append(yoy)
+            comp_details.append({
+                "address": c.get("situsconcat", ""),
+                "sqft": int(float(c.get("imprvmainarea", 0) or 0)),
+                "year_built": c.get("imprvyearbuilt", ""),
+                "prev_value": int(prev),
+                "curr_value": int(curr),
+                "yoy_change_pct": round(yoy, 2),
+            })
+        except (ValueError, TypeError, ZeroDivisionError):
+            continue
+
+    n = len(yoy_pcts)
+    if n == 0:
+        return {"count": 0, "comps": []}
+
+    return {
+        "count": n,
+        "median_yoy_pct": round(statistics.median(yoy_pcts), 2),
+        "mean_yoy_pct": round(statistics.mean(yoy_pcts), 2),
+        "stdev_yoy_pct": round(statistics.stdev(yoy_pcts) if n >= 2 else 0.0, 2),
+        "pct_increased": round(sum(1 for y in yoy_pcts if y > 0) / n * 100, 1),
+        "pct_decreased": round(sum(1 for y in yoy_pcts if y < 0) / n * 100, 1),
+        "comps": sorted(comp_details, key=lambda x: x["yoy_change_pct"]),
+    }
+
+
+def _build_evidence_doc(
+    subject: Dict[str, Any],
+    stats: Dict[str, Any],
+    state: str,
+    county_display: str,
+    dataset_id: str,
+    comps_source: str,
+    size_tolerance_pct: int,
+) -> str:
+    """Render a markdown protest evidence package for an outlier appraisal increase."""
+    from datetime import date as _date
+
+    subj_prev = subject["prev_value"]
+    subj_curr = subject["curr_value"]
+    subj_yoy = subject["yoy_change_pct"]
+    comp_median = stats["median_yoy_pct"]
+    gap_pp = round(subj_yoy - comp_median, 2)
+    target_value = int(subj_prev * (1 + comp_median / 100))
+    reduction = subj_curr - target_value
+    reduction_pct = round(reduction / subj_curr * 100, 2)
+
+    comp_yoys = sorted(c["yoy_change_pct"] for c in stats["comps"])
+    rank_below = sum(1 for y in comp_yoys if y < subj_yoy)
+    percentile = int(rank_below / len(comp_yoys) * 100) if comp_yoys else 50
+
+    size_min = int(subject["sqft"] * (1 - size_tolerance_pct / 100))
+    size_max = int(subject["sqft"] * (1 + size_tolerance_pct / 100))
+    source_label = (
+        f"neighborhood code **{subject['neighborhood_code']}**"
+        if comps_source == "neighborhood"
+        else f"zip code **{subject.get('situszip', '')}**"
+    )
+
+    if state.upper() == "TX":
+        legal_block = (
+            "Under **Texas Tax Code §41.43**, the appraisal district bears the burden of "
+            "establishing value if the proposed appraisal exceeds the median appraised value "
+            "of a reasonable number of comparable properties, appropriately adjusted. "
+            "The evidence above demonstrates that the subject property's appraised value "
+            "is materially inconsistent with comparable properties in the same area.\n\n"
+            f"**Recommended action:** File a formal protest with the **{county_display} "
+            "Appraisal Review Board (ARB)** before the protest deadline (typically **May 15** "
+            "or **30 days after the notice date**, whichever is later). "
+            "Attach this document as your comparables evidence."
+        )
+    else:
+        legal_block = (
+            "Property taxation requires uniform and equal appraisal of comparable properties. "
+            "The evidence above indicates the subject property's appraised value increased "
+            "materially more than comparable properties in the same area during the same "
+            "appraisal cycle.\n\n"
+            f"**Recommended action:** Contact the **{county_display}** appraisal authority "
+            "for protest procedures, deadlines, and the appropriate review board. "
+            "Attach this document as your comparables evidence."
+        )
+
+    comp_rows = "\n".join(
+        f"| {c['address']} | {c['sqft']:,} | {c['year_built']} | "
+        f"${c['prev_value']:,} | ${c['curr_value']:,} | "
+        f"{'▲' if c['yoy_change_pct'] > 0 else '▼'} {abs(c['yoy_change_pct']):.2f}% |"
+        for c in stats["comps"]
+    )
+
+    today = _date.today().strftime("%B %d, %Y")
+
+    return f"""# Property Tax Protest Evidence Package
+
+**Property:** {subject['address']}
+**Property ID:** {subject['propid']}
+**Owner:** {subject['owner']}
+**Tax Year:** {subject.get('curr_year', '')}
+**Prepared:** {today}
+
+---
+
+## 1. Subject Property
+
+| Field | Value |
+|-------|-------|
+| Address | {subject['address']} |
+| Owner | {subject['owner']} |
+| Neighborhood Code | {subject['neighborhood_code']} |
+| Property Type | {subject['propcategorycode']} (Residential) |
+| Size | {subject['sqft']:,} sq ft |
+| Year Built | {subject['year_built']} |
+| Homestead Exemption | {'Yes' if subject['has_homestead'] else 'No'} |
+| **Prior-Year Appraised Value** | **${subj_prev:,}** |
+| **Current Appraised Value** | **${subj_curr:,}** |
+| **Dollar Increase** | **${subj_curr - subj_prev:,}** |
+| **Percent Increase** | **+{subj_yoy:.2f}%** |
+
+---
+
+## 2. Comparable Property Analysis
+
+Comparables sourced from: {source_label}, property type **{subject['propcategorycode']}**, size range **{size_min:,}–{size_max:,} sq ft** (±{size_tolerance_pct}% of subject).
+New-construction properties (no prior-year appraisal value) were excluded.
+
+| Address | Sq Ft | Yr Built | Prior Value | Current Value | Change |
+|---------|-------|----------|------------|--------------|--------|
+{comp_rows}
+
+*{stats['count']} comparable properties analyzed.*
+
+---
+
+## 3. Statistical Summary
+
+- **Comparable properties analyzed:** {stats['count']}
+- **Median YoY change:** {comp_median:+.2f}%
+- **Mean YoY change:** {stats['mean_yoy_pct']:+.2f}%
+- **Std deviation:** {stats['stdev_yoy_pct']:.2f} percentage points
+- **Properties that increased:** {stats['pct_increased']:.1f}%
+- **Properties that decreased:** {stats['pct_decreased']:.1f}%
+- **Subject percentile rank:** {percentile}th percentile among comparables (ranked {rank_below + 1} of {stats['count']} by YoY change)
+- **Subject increase vs. comparable median:** **+{gap_pp:.2f} percentage points above peers**
+
+---
+
+## 4. Basis for Protest
+
+The subject property's appraised value increased by **{subj_yoy:.2f}%**, while {stats['count']} comparable properties experienced a median change of **{comp_median:+.2f}%**. The subject's increase exceeds the comparable median by **{gap_pp:.2f} percentage points**.
+
+{legal_block}
+
+---
+
+## 5. Requested Relief
+
+We respectfully request that the appraised value of **${subj_curr:,}** be reduced to no more than **${target_value:,}** — the value consistent with applying the comparable-set median appreciation rate ({comp_median:+.2f}%) to the prior certified value of ${subj_prev:,}. This represents a reduction of **${reduction:,}** (**{reduction_pct:.1f}%**).
+
+---
+
+## 6. Data Provenance
+
+All comparable data sourced from **{county_display} CAD** official certified appraisal records via the Texas Open Data Portal (data.texas.gov), dataset ID **{dataset_id}**, retrieved on {today}.
+""".strip()
+
 
 @mcp.tool()
 def search_properties(address: Optional[str] = None, owner: Optional[str] = None, zip_code: Optional[str] = None, limit: int = 10, county: str = "collin") -> str:
@@ -213,6 +391,161 @@ def list_supported_locations(state: Optional[str] = None, county: Optional[str] 
 
     except ValueError as e:
         return json.dumps({"error": str(e)})
+
+@mcp.tool()
+def comp_investigator(property_id: str, county: str = "collin", size_tolerance_pct: int = 20) -> str:
+    """
+    Investigate whether a property's appraisal increase is consistent with comparable
+    properties in the same neighborhood. If the increase is a statistical outlier,
+    generates a formatted protest evidence document ready for submission to the
+    appraisal review board.
+
+    Returns JSON with:
+    - subject: subject property details and YoY change
+    - comps_source: "neighborhood" (preferred) or "zip" (fallback)
+    - comps_count: number of comparable properties analyzed
+    - comps_summary: median/mean/stdev YoY change and per-comp breakdown
+    - determination: "warranted" | "not_warranted" | "insufficient_data" | "no_increase"
+    - determination_reason: plain-English explanation of the result
+    - evidence_document: (only present when determination == "not_warranted") a
+      markdown protest evidence package including comparable data, statistical
+      analysis, state-appropriate legal framing, and a requested relief amount
+    """
+    try:
+        reg = get_registry(county)
+        domain = reg["domain"]
+        dataset_id = reg["appraisal_dataset"]
+        state = reg.get("state", "")
+        county_display = reg.get("display_name", county.title())
+        _ensure_cache(domain, reg)
+
+        # Step 1: Fetch subject property
+        records = client.fetch_page(domain, dataset_id, limit=1,
+                                    where=f"propid = '{_sanitize(property_id)}'")
+        if not records:
+            return json.dumps({"error": f"Property ID '{property_id}' not found."})
+
+        raw = records[0]
+        try:
+            prev_val = float(raw.get("prevvalmarket", 0) or 0)
+            curr_val = float(raw.get("currvalmarket", 0) or 0)
+            sqft     = float(raw.get("imprvmainarea", 0) or 0)
+        except (ValueError, TypeError):
+            return json.dumps({"error": "Property has unparseable value fields."})
+
+        if prev_val <= 0:
+            return json.dumps({"error": "Property has no prior-year value — cannot compute year-over-year change."})
+
+        subject = {
+            "propid":             raw.get("propid", property_id),
+            "address":            raw.get("situsconcat", ""),
+            "owner":              raw.get("ownername", ""),
+            "neighborhood_code":  raw.get("nbhdcode", ""),
+            "situszip":           raw.get("situszip", ""),
+            "propcategorycode":   raw.get("propcategorycode", ""),
+            "sqft":               int(sqft),
+            "year_built":         raw.get("imprvyearbuilt", ""),
+            "prev_value":         int(prev_val),
+            "curr_value":         int(curr_val),
+            "yoy_change_pct":     round((curr_val - prev_val) / prev_val * 100, 2),
+            "has_homestead":      bool(raw.get("exempthmstdflag", False)),
+            "curr_year":          raw.get("currvalyear", ""),
+        }
+
+        # Step 2: No protest basis if value didn't increase
+        if curr_val <= prev_val:
+            return json.dumps({
+                "subject": subject,
+                "determination": "no_increase",
+                "determination_reason": (
+                    f"Value decreased or stayed flat "
+                    f"({subject['yoy_change_pct']:+.2f}%). No protest basis."
+                ),
+            }, indent=2)
+
+        # Step 3: Fetch comps — Tier 1 (neighborhood), Tier 2 (zip fallback)
+        nbhd     = _sanitize(raw.get("nbhdcode", ""))
+        situszip = _sanitize(raw.get("situszip", ""))
+        cat      = _sanitize(raw.get("propcategorycode", "A"))
+        size_min = max(1, int(sqft * (1 - size_tolerance_pct / 100)))
+        size_max = int(sqft * (1 + size_tolerance_pct / 100))
+        base_filters = (
+            f"propcategorycode = '{cat}'"
+            f" AND imprvmainarea > {size_min} AND imprvmainarea < {size_max}"
+            f" AND prevvalmarket > 0 AND currvalmarket > 0"
+            f" AND propid != '{_sanitize(property_id)}'"
+        )
+
+        comps_source = "neighborhood"
+        comps_raw: List[Dict[str, Any]] = []
+
+        if nbhd:
+            comps_raw = client.fetch_page(domain, dataset_id, limit=50,
+                                          where=f"nbhdcode = '{nbhd}' AND {base_filters}")
+
+        if len(comps_raw) < 5 and situszip:
+            comps_source = "zip"
+            comps_raw = client.fetch_page(domain, dataset_id, limit=75,
+                                          where=f"situszip = '{situszip}' AND {base_filters}")
+
+        # Step 4: Compute statistics
+        stats = _comp_stats(comps_raw)
+
+        if stats["count"] < 5:
+            return json.dumps({
+                "subject": subject,
+                "comps_source": comps_source,
+                "comps_count": stats["count"],
+                "determination": "insufficient_data",
+                "determination_reason": (
+                    f"Only {stats['count']} comparable properties found "
+                    f"(minimum 5 required for a reliable comparison)."
+                ),
+            }, indent=2)
+
+        # Step 5: Determine warrant
+        comp_median = stats["median_yoy_pct"]
+        comp_stdev  = stats["stdev_yoy_pct"]
+        threshold   = max(comp_stdev, 3.0)
+        subject_yoy = subject["yoy_change_pct"]
+        gap_pp      = round(subject_yoy - comp_median, 2)
+        is_outlier  = subject_yoy > (comp_median + threshold)
+
+        determination = "not_warranted" if is_outlier else "warranted"
+        reason = (
+            f"Subject increased {subject_yoy:+.2f}% vs comparable median of "
+            f"{comp_median:+.2f}% — {gap_pp:+.2f} pp above peers "
+            f"(outlier threshold: {comp_median + threshold:.2f}%)."
+        )
+
+        result: Dict[str, Any] = {
+            "subject":              subject,
+            "comps_source":         comps_source,
+            "comps_count":          stats["count"],
+            "comps_summary":        stats,
+            "determination":        determination,
+            "determination_reason": reason,
+        }
+
+        if determination == "not_warranted":
+            result["evidence_document"] = _build_evidence_doc(
+                subject=subject,
+                stats=stats,
+                state=state,
+                county_display=county_display,
+                dataset_id=dataset_id,
+                comps_source=comps_source,
+                size_tolerance_pct=size_tolerance_pct,
+            )
+
+        return json.dumps(result, indent=2)
+
+    except ValueError as e:
+        return json.dumps({"error": str(e)})
+    except Exception as e:
+        logger.error(f"comp_investigator error: {e}", exc_info=True)
+        return json.dumps({"error": str(e)})
+
 
 @mcp.tool()
 def discover_county_datasets(county_name: str) -> str:
