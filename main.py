@@ -11,7 +11,7 @@ import logging
 logger.setLevel(logging.INFO)
 
 # Initialize MCP server
-mcp = FastMCP("Socrata-Real-Estate")
+mcp = FastMCP("mcp-socrata-readonly")
 client = SocrataClient()
 geo = Geocoder()
 
@@ -45,6 +45,48 @@ def _format_property(reg: Dict[str, str], prop: Dict[str, Any]) -> Dict[str, Any
     
     return formatted
 
+def _sanitize(value: str) -> str:
+    """Escape single quotes for SODA SoQL string literals."""
+    return value.replace("'", "''")
+
+def _word_boundary_clause(field: str, token: str) -> str:
+    """Match token as a whole word (not as a substring of a longer word)."""
+    t = _sanitize(token)
+    return (
+        f"({field} = '{t}'"
+        f" OR {field} like '{t} %'"
+        f" OR {field} like '% {t} %'"
+        f" OR {field} like '% {t}')"
+    )
+
+def _build_owner_where(owner: str) -> str:
+    """
+    Build a SODA WHERE clause for owner name matching with:
+    - Word-boundary awareness for single tokens (avoids partial matches like balamuru→balamurugan)
+    - Phrase reversal for multi-word queries (handles 'vinay balamuru' → 'BALAMURU VINAY')
+    - Per-token word-boundary AND for multi-word queries
+    """
+    tokens = owner.lower().split()
+    if not tokens:
+        return "1=1"
+
+    field = "lower(ownername)"
+
+    if len(tokens) == 1:
+        return _word_boundary_clause(field, tokens[0])
+
+    phrase = " ".join(_sanitize(t) for t in tokens)
+    reversed_phrase = " ".join(_sanitize(t) for t in reversed(tokens))
+
+    clauses = [f"{field} like '%{phrase}%'"]
+    if reversed_phrase != phrase:
+        clauses.append(f"{field} like '%{reversed_phrase}%'")
+    # Also match records where every token appears as a whole word (any order)
+    token_clauses = [_word_boundary_clause(field, t) for t in tokens]
+    clauses.append("(" + " AND ".join(token_clauses) + ")")
+
+    return "(" + " OR ".join(clauses) + ")"
+
 @mcp.tool()
 def search_properties(address: Optional[str] = None, owner: Optional[str] = None, zip_code: Optional[str] = None, limit: int = 10, county: str = "collin") -> str:
     """
@@ -54,20 +96,22 @@ def search_properties(address: Optional[str] = None, owner: Optional[str] = None
     reg = get_registry(county)
     domain = reg["domain"]
     _ensure_cache(domain, reg)
-    
+
     where_clauses = []
     if address:
-        where_clauses.append(f"lower(situsconcat) like '%{address.lower()}%'")
+        # Allow * as a user-friendly wildcard; sanitize quotes
+        addr_pattern = _sanitize(address.lower()).replace("*", "%")
+        where_clauses.append(f"lower(situsconcat) like '%{addr_pattern}%'")
     if owner:
-        where_clauses.append(f"lower(ownername) like '%{owner.lower()}%'")
+        where_clauses.append(_build_owner_where(owner))
     if zip_code:
-        where_clauses.append(f"situszip = '{zip_code}'")
-        
+        where_clauses.append(f"situszip = '{_sanitize(zip_code)}'")
+
     if not where_clauses:
         return json.dumps({"error": "Must provide at least one search parameter (address, owner, or zip_code)."})
-        
+
     where_query = " AND ".join(where_clauses)
-    
+
     try:
         records = client.fetch_page(domain, reg["appraisal_dataset"], limit=limit, where=where_query)
         formatted_records = [_format_property(reg, r) for r in records]

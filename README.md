@@ -75,7 +75,7 @@ The server is configured using environment variables. You can specify these vari
 ```json
 {
   "mcpServers": {
-    "socrata-real-estate": {
+    "mcp-socrata-readonly": {
       "command": "/path/to/mcp-socrata-readonly/venv/bin/fastmcp",
       "args": ["run", "/path/to/mcp-socrata-readonly/main.py"],
       "env": {
@@ -110,7 +110,7 @@ claude mcp add --scope local \
   -e SOCRATA_KEY_ID=YOUR_API_KEY_ID_HERE \
   -e SOCRATA_KEY_SECRET=YOUR_API_KEY_SECRET_HERE \
   -e USER_AGENT_EMAIL=your-email@example.com \
-  socrata-real-estate \
+  mcp-socrata-readonly \
   /path/to/mcp-socrata-readonly/venv/bin/fastmcp \
   run /path/to/mcp-socrata-readonly/main.py
 ```
@@ -137,7 +137,7 @@ In embedded mode, the server communicates with your AI client (like Claude Deskt
 ```json
 {
   "mcpServers": {
-    "socrata-real-estate": {
+    "mcp-socrata-readonly": {
       "command": "/path/to/mcp-socrata-readonly/venv/bin/fastmcp",
       "args": ["run", "/path/to/mcp-socrata-readonly/main.py"]
     }
@@ -150,7 +150,7 @@ In embedded mode, the server communicates with your AI client (like Claude Deskt
 Add this configuration using the CLI command (see [Claude Code Configuration](#claude-code-configuration) for scope options):
 ```bash
 claude mcp add --scope local \
-  socrata-real-estate \
+  mcp-socrata-readonly \
   /path/to/mcp-socrata-readonly/venv/bin/fastmcp \
   run /path/to/mcp-socrata-readonly/main.py
 ```
@@ -230,7 +230,7 @@ Then configure it in the client config (e.g., `claude_desktop_config.json`):
 ```json
 {
   "mcpServers": {
-    "socrata-real-estate": {
+    "mcp-socrata-readonly": {
       "command": "mcp-socrata",
       "env": {
         "SOCRATA_APP_TOKEN": "YOUR_SOCRATA_APP_TOKEN"
