@@ -3,13 +3,15 @@ from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 import logging
 from typing import List, Dict, Any, Optional
-from config import SOCRATA_APP_TOKEN
+from config import SOCRATA_APP_TOKEN, SOCRATA_KEY_ID, SOCRATA_KEY_SECRET
 
 logger = logging.getLogger("socrata-mcp.client")
 
 class SocrataClient:
-    def __init__(self, app_token: Optional[str] = None):
+    def __init__(self, app_token: Optional[str] = None, key_id: Optional[str] = None, key_secret: Optional[str] = None):
         self.app_token = app_token or SOCRATA_APP_TOKEN
+        self.key_id = key_id or SOCRATA_KEY_ID
+        self.key_secret = key_secret or SOCRATA_KEY_SECRET
         self.session = self._build_session()
         
     def _build_session(self) -> requests.Session:
@@ -17,6 +19,9 @@ class SocrataClient:
         
         if self.app_token:
             session.headers.update({"X-App-Token": self.app_token})
+            
+        if self.key_id and self.key_secret:
+            session.auth = (self.key_id, self.key_secret)
             
         # Retry strategy for 429 (Rate Limit) and 50x (Server Errors)
         retries = Retry(

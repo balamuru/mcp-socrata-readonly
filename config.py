@@ -14,7 +14,11 @@ logger = logging.getLogger("socrata-mcp")
 
 # Environment configurations
 SOCRATA_APP_TOKEN = os.getenv("SOCRATA_APP_TOKEN", None)
+# Basic authentication API keys (Key ID and Key Secret)
+SOCRATA_KEY_ID = os.getenv("SOCRATA_KEY_ID", None)
+SOCRATA_KEY_SECRET = os.getenv("SOCRATA_KEY_SECRET", None)
 # Used for Nominatim geocoding (they require an email in the User-Agent)
 USER_AGENT_EMAIL = os.getenv("USER_AGENT_EMAIL", "socrata_mcp_default@example.com")
 # Cache expiration time
 CACHE_TTL_DAYS = int(os.getenv("CACHE_TTL_DAYS", "7"))
+
