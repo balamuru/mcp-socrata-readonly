@@ -35,7 +35,7 @@ class SocrataClient:
         session.mount("http://", adapter)
         return session
 
-    def fetch_page(self, domain: str, dataset_id: str, limit: int = 1000, offset: int = 0, select: str = None, where: str = None, order: str = None) -> List[Dict[str, Any]]:
+    def fetch_page(self, domain: str, dataset_id: str, limit: int = 1000, offset: int = 0, select: str = None, where: str = None, order: str = None, group: str = None) -> List[Dict[str, Any]]:
         """Fetch a single page of results using SODA API."""
         url = f"https://{domain}/resource/{dataset_id}.json"
         params = {
@@ -45,6 +45,7 @@ class SocrataClient:
         if select: params["$select"] = select
         if where: params["$where"] = where
         if order: params["$order"] = order
+        if group: params["$group"] = group
         
         logger.info(f"Fetching {url} limit={limit} offset={offset}")
         response = self.session.get(url, params=params, timeout=30)

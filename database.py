@@ -59,6 +59,16 @@ def init_db():
                 PRIMARY KEY (dataset_id, entity_code)
             )
         ''')
+
+        # Cities/zip codes table (for list_supported_locations)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS cities (
+                dataset_id TEXT,
+                city_name  TEXT,
+                zip_code   TEXT,
+                PRIMARY KEY (dataset_id, city_name, zip_code)
+            )
+        ''')
         conn.commit()
 
 def is_cache_valid(dataset_id: str, table_name: str) -> bool:
@@ -131,6 +141,32 @@ def insert_entities(cursor: sqlite3.Cursor, dataset_id: str, records: List[Dict[
                 INSERT OR REPLACE INTO entities (dataset_id, entity_code, entity_description, tax_rate)
                 VALUES (?, ?, ?, ?)
             ''', (dataset_id, code, desc, rate))
+
+def insert_cities(cursor: sqlite3.Cursor, dataset_id: str, records: List[Dict[str, Any]]):
+    """Mapping function for city/zip pairs from the appraisal dataset."""
+    for r in records:
+        city = (r.get("situscity") or "").strip().upper()
+        zip_code = (r.get("situszip") or "").strip()
+        if city and zip_code:
+            cursor.execute('''
+                INSERT OR REPLACE INTO cities (dataset_id, city_name, zip_code)
+                VALUES (?, ?, ?)
+            ''', (dataset_id, city, zip_code))
+
+def get_cached_cities(dataset_id: str) -> List[Dict[str, Any]]:
+    """Return all city/zip pairs for a dataset, grouped by city with sorted zip lists."""
+    with get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT city_name, zip_code FROM cities WHERE dataset_id = ? ORDER BY city_name, zip_code',
+            (dataset_id,)
+        )
+        rows = cursor.fetchall()
+
+    grouped: Dict[str, List[str]] = {}
+    for row in rows:
+        grouped.setdefault(row["city_name"], []).append(row["zip_code"])
+    return [{"city": city, "zip_codes": zips} for city, zips in grouped.items()]
 
 def get_cached_neighborhood(dataset_id: str, code: str) -> str:
     with get_connection() as conn:

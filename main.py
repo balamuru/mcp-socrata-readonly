@@ -2,7 +2,7 @@ from fastmcp import FastMCP
 from typing import Optional, List, Dict, Any
 from socrata_client import SocrataClient
 from geocoder import Geocoder
-from registry import get_registry
+from registry import get_registry, list_states, list_counties
 import database
 import json
 from config import logger
@@ -14,6 +14,22 @@ logger.setLevel(logging.INFO)
 mcp = FastMCP("mcp-socrata-readonly")
 client = SocrataClient()
 geo = Geocoder()
+
+def _fetch_and_cache_cities(domain: str, reg: Dict[str, str]) -> List[Dict[str, Any]]:
+    """Return city/zip pairs for a county, fetching from Socrata if the cache is stale."""
+    appraisal_dataset = reg["appraisal_dataset"]
+    if not database.is_cache_valid(appraisal_dataset, "cities"):
+        logger.info(f"Rebuilding cities cache for dataset {appraisal_dataset}...")
+        records = client.fetch_page(
+            domain, appraisal_dataset,
+            limit=500,
+            select="situscity,situszip",
+            where="situscity IS NOT NULL AND situszip IS NOT NULL",
+            group="situscity,situszip",
+            order="situscity ASC,situszip ASC",
+        )
+        database.update_cache(appraisal_dataset, "cities", records, database.insert_cities)
+    return database.get_cached_cities(appraisal_dataset)
 
 def _ensure_cache(domain: str, reg: Dict[str, str]):
     nbhd_dataset = reg["neighborhood_dataset"]
@@ -153,6 +169,50 @@ def query_properties_near(address: str, radius_miles: float = 1.0, limit: int = 
         return json.dumps({"error": f"Could not geocode address: {address}"})
         
     return json.dumps({"error": "Geospatial search (within_circle) requires a Socrata Point column, which is not natively exposed in the Collin CAD Appraisal Dataset. Feature unavailable."})
+
+@mcp.tool()
+def list_supported_locations(state: Optional[str] = None, county: Optional[str] = None) -> str:
+    """
+    Browse the geographic coverage supported by this MCP server.
+
+    - No arguments:          lists all supported states.
+    - state="TX":            lists all supported counties in Texas.
+    - county="collin":       lists all cities and zip codes within Collin County.
+    - state="TX", county="collin": same as above (state disambiguates if county key is shared across states).
+    """
+    try:
+        # County-level drill-down: return cities + zip codes
+        if county:
+            reg = get_registry(county)
+            domain = reg["domain"]
+            cities = _fetch_and_cache_cities(domain, reg)
+            return json.dumps({
+                "level": "cities",
+                "county": county.lower().strip(),
+                "display_name": reg.get("display_name", county),
+                "state": reg.get("state", ""),
+                "cities": cities,
+            }, indent=2)
+
+        # State-level drill-down: return matching counties
+        if state:
+            counties = list_counties(state)
+            if not counties:
+                return json.dumps({"error": f"No supported counties found for state '{state}'."})
+            return json.dumps({
+                "level": "counties",
+                "state": state.upper(),
+                "counties": counties,
+            }, indent=2)
+
+        # Top level: return all supported states
+        return json.dumps({
+            "level": "states",
+            "supported_states": list_states(),
+        }, indent=2)
+
+    except ValueError as e:
+        return json.dumps({"error": str(e)})
 
 @mcp.tool()
 def discover_county_datasets(county_name: str) -> str:

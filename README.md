@@ -6,13 +6,14 @@ This server solves Socrata's lack of native `JOIN` support by securely caching m
 
 ## Features & Functionality
 
-The server exposes five AI-ready MCP tools:
+The server exposes six AI-ready MCP tools:
 
-1. **`search_properties`**: Search for properties via address, owner name, or zip code. Automatically resolves complex IDs into readable Neighborhood names and Taxing Entity combinations.
-2. **`get_property_detail`**: Perform a deep dive into a specific property record using its unique `propid`.
-3. **`query_properties_near`**: Translates English addresses into exact coordinates (using the free US Census Geocoder to avoid cloud-IP bans) to verify geospatial locations.
-4. **`discover_county_datasets`**: Queries the Socrata Global Catalog (`api.us.socrata.com`) to dynamically discover available datasets by county name.
-5. **`refresh_cache`**: On-demand manual rebuild of the local SQLite relational cache.
+1. **`list_supported_locations`**: Browse geographic coverage hierarchically — state → county → cities with zip codes. Call with no arguments to see supported states, pass `state="TX"` to see counties, or pass `county="collin"` to get every city and zip code available in that county's dataset. City/zip results are cached in SQLite using the same TTL as other lookup tables.
+2. **`search_properties`**: Search for properties via address, owner name, or zip code. Automatically resolves complex IDs into readable Neighborhood names and Taxing Entity combinations.
+3. **`get_property_detail`**: Perform a deep dive into a specific property record using its unique `propid`.
+4. **`query_properties_near`**: Translates English addresses into exact coordinates (using the free US Census Geocoder to avoid cloud-IP bans) to verify geospatial locations.
+5. **`discover_county_datasets`**: Queries the Socrata Global Catalog (`api.us.socrata.com`) to dynamically discover available datasets by county name.
+6. **`refresh_cache`**: On-demand manual rebuild of the local SQLite relational cache.
 
 ---
 
