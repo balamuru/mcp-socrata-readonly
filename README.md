@@ -6,7 +6,7 @@ This server solves Socrata's lack of native `JOIN` support by securely caching m
 
 ## Features & Functionality
 
-The server exposes six AI-ready MCP tools:
+The server exposes seven AI-ready MCP tools:
 
 1. **`list_supported_locations`**: Browse geographic coverage hierarchically — state → county → cities with zip codes. Call with no arguments to see supported states, pass `state="TX"` to see counties, or pass `county="collin"` to get every city and zip code available in that county's dataset. City/zip results are cached in SQLite using the same TTL as other lookup tables.
 2. **`search_properties`**: Search for properties via address, owner name, or zip code. Automatically resolves complex IDs into readable Neighborhood names and Taxing Entity combinations.
@@ -14,6 +14,7 @@ The server exposes six AI-ready MCP tools:
 4. **`query_properties_near`**: Translates English addresses into exact coordinates (using the free US Census Geocoder to avoid cloud-IP bans) to verify geospatial locations.
 5. **`discover_county_datasets`**: Queries the Socrata Global Catalog (`api.us.socrata.com`) to dynamically discover available datasets by county name.
 6. **`refresh_cache`**: On-demand manual rebuild of the local SQLite relational cache.
+7. **`comp_investigator`**: Analyzes whether a property's year-over-year appraisal increase is consistent with comparable properties in the same neighborhood. Compares the subject against up to ±20% size-matched neighbors (falling back to zip code if the neighborhood has too few comps) and runs a statistical outlier test. Returns a `determination` of `warranted`, `not_warranted`, `insufficient_data`, or `no_increase`. When the increase is an outlier, also generates a ready-to-submit markdown protest evidence package — including a comparable-property table, statistical summary, Texas Tax Code §41.43 legal framing, and a specific requested relief amount.
 
 ---
 
