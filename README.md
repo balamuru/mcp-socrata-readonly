@@ -79,7 +79,11 @@ cp env.template .env
 > * To authenticate, you can either use an **App Token** (`SOCRATA_APP_TOKEN`) or an **API Key & Secret** pair (`SOCRATA_KEY_ID` and `SOCRATA_KEY_SECRET`).
 > * You do **not** need both. If you only have the API Key & Secret, you can leave `SOCRATA_APP_TOKEN` blank, and the client will use HTTP Basic Authentication.
 
-### Client Configuration Example (e.g., `claude_desktop_config.json`):
+### 1. JSON-based Client Configuration (Antigravity IDE, Claude Desktop, Cursor, etc.)
+
+For AI clients configured via a JSON settings file, add the server configuration under the `mcpServers` key. Be sure to supply the required environment variables in the `env` object.
+
+**Example Configuration (`config.json`):**
 ```json
 {
   "mcpServers": {
@@ -97,9 +101,9 @@ cp env.template .env
 }
 ```
 
-### Claude Code Configuration:
+### 2. CLI-based Configuration (Claude Code)
 
-For **Claude Code**, MCP servers are configured via the CLI using one of three scopes:
+For **Claude Code**, MCP servers are configured via the CLI command line. Variables are passed using `-e` flags, keeping your credentials stored privately.
 
 | Scope | Flag | Stored In | Visibility |
 | :--- | :--- | :--- | :--- |
@@ -110,8 +114,7 @@ For **Claude Code**, MCP servers are configured via the CLI using one of three s
 > [!NOTE]
 > `mcpServers` in `.claude/settings.json` is **not** a valid MCP configuration location for Claude Code. That file is only for general settings (permissions, hooks, etc.). Always use `claude mcp add` or `.mcp.json`.
 
-The recommended way is to use the Claude Code CLI (credentials stay private in `~/.claude.json`):
-
+**Recommended Configuration Command:**
 ```bash
 claude mcp add --scope local \
   -e SOCRATA_APP_TOKEN=YOUR_SOCRATA_APP_TOKEN_HERE \
@@ -125,62 +128,26 @@ claude mcp add --scope local \
 
 To share the server config with your team (without credentials), use `--scope project`, which writes to `.mcp.json` in the project root — commit that file and let each developer supply their own credentials via `.env` or `claude mcp add --scope local`.
 
-You can verify the server is connected with:
+Verify that the server is connected with:
 ```bash
 claude mcp list
 ```
 
 ---
 
-
 ## 🚀 Usage Modes
 
 This server leverages `fastmcp` and can be run in three different modes depending on your architecture needs:
 
-*   **Embedded Mode (STDIO)**: The AI client (e.g., Claude Desktop, Antigravity IDE, Cursor) runs the server as a child process and communicates via standard input/output. This is typically used for local, single-user setups. It's the most secure and frictionless method because the server starts and stops with the client, requiring no network ports.
+*   **Embedded Mode (STDIO)**: The AI client (e.g., Antigravity IDE, Claude Desktop, Cursor) runs the server as a child process and communicates via standard input/output. This is typically used for local, single-user setups. It's the most secure and frictionless method because the server starts and stops with the client, requiring no network ports.
 *   **Standalone Mode (SSE / HTTP)**: The server runs independently as a long-running web process, communicating via Server-Sent Events over HTTP. This is required if the server and the AI client are on different machines, or if you want to expose a single server instance to multiple clients simultaneously over a network.
 *   **Development Mode**: A built-in web UI to manually test the tools in a browser.
 
 ### 1. Embedded Mode (STDIO) - Recommended for AI Assistants
-In embedded mode, the server communicates with your AI client directly through standard input/output.
 
-**Configuration for Antigravity IDE:**
-You can add this server in Antigravity IDE's MCP configuration settings using the following JSON:
-```json
-{
-  "mcpServers": {
-    "mcp-socrata-readonly": {
-      "command": "/path/to/mcp-socrata-readonly/venv/bin/fastmcp",
-      "args": ["run", "/path/to/mcp-socrata-readonly/main.py"],
-      "env": {
-        "SOCRATA_APP_TOKEN": "YOUR_SOCRATA_APP_TOKEN_HERE"
-      }
-    }
-  }
-}
-```
+In embedded mode, the server communicates with your AI client directly through standard input/output. 
 
-**Configuration for other AI Clients (e.g., `claude_desktop_config.json`, Cursor):**
-```json
-{
-  "mcpServers": {
-    "mcp-socrata-readonly": {
-      "command": "/path/to/mcp-socrata-readonly/venv/bin/fastmcp",
-      "args": ["run", "/path/to/mcp-socrata-readonly/main.py"]
-    }
-  }
-}
-```
-
-**Configuration for Claude Code:**
-
-Add this configuration using the CLI command (see [Claude Code Configuration](#claude-code-configuration) for scope options):
-```bash
-claude mcp add --scope local \
-  mcp-socrata-readonly \
-  /path/to/mcp-socrata-readonly/venv/bin/fastmcp \
-  run /path/to/mcp-socrata-readonly/main.py
-```
+Refer to the [Configuration](#️-configuration) section above for details on how to register this server in your specific AI client (such as **Antigravity IDE**, **Claude Desktop**, **Cursor**, or **Claude Code**).
 
 ### 2. Standalone Mode (SSE / HTTP)
 If you want to host this MCP server independently, across a network, or expose it to multiple clients simultaneously, you can run it via Server-Sent Events (SSE). 
