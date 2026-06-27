@@ -51,7 +51,7 @@ If the subject property's increase is a statistical outlier compared to its peer
 
 ### Example Output
 
-When a user asks: *"Can you check the comps for 5601 Rickshaw Lane for the 2025 tax year?"*, the agent runs the investigator and instantly outputs a structured protest package:
+When a user asks: *"Can you check the comps for 1234 Main Street for the 2026 tax year?"*, the agent runs the investigator and instantly outputs a structured protest package:
 
 ```markdown
 ## 4. Basis for Protest
