@@ -123,19 +123,38 @@ You can verify the server is connected with:
 ```bash
 claude mcp list
 ```
-```
 
 ---
 
 
 ## 🚀 Usage Modes
 
-This server leverages `fastmcp` and can be run in **Embedded Mode** (STDIO), **Standalone Mode** (SSE), or **Development Mode**.
+This server leverages `fastmcp` and can be run in three different modes depending on your architecture needs:
+
+*   **Embedded Mode (STDIO)**: The AI client (e.g., Claude Desktop, Antigravity IDE, Cursor) runs the server as a child process and communicates via standard input/output. This is typically used for local, single-user setups. It's the most secure and frictionless method because the server starts and stops with the client, requiring no network ports.
+*   **Standalone Mode (SSE / HTTP)**: The server runs independently as a long-running web process, communicating via Server-Sent Events over HTTP. This is required if the server and the AI client are on different machines, or if you want to expose a single server instance to multiple clients simultaneously over a network.
+*   **Development Mode**: A built-in web UI to manually test the tools in a browser.
 
 ### 1. Embedded Mode (STDIO) - Recommended for AI Assistants
-In embedded mode, the server communicates with your AI client (like Claude Desktop, Cursor, or Cline) directly through standard input/output. This is the most secure and frictionless way to use the server.
+In embedded mode, the server communicates with your AI client directly through standard input/output.
 
-**Configuration for your AI Client (e.g., `claude_desktop_config.json`):**
+**Configuration for Antigravity IDE:**
+You can add this server in Antigravity IDE's MCP configuration settings using the following JSON:
+```json
+{
+  "mcpServers": {
+    "mcp-socrata-readonly": {
+      "command": "/path/to/mcp-socrata-readonly/venv/bin/fastmcp",
+      "args": ["run", "/path/to/mcp-socrata-readonly/main.py"],
+      "env": {
+        "SOCRATA_APP_TOKEN": "YOUR_SOCRATA_APP_TOKEN_HERE"
+      }
+    }
+  }
+}
+```
+
+**Configuration for other AI Clients (e.g., `claude_desktop_config.json`, Cursor):**
 ```json
 {
   "mcpServers": {
@@ -155,7 +174,6 @@ claude mcp add --scope local \
   mcp-socrata-readonly \
   /path/to/mcp-socrata-readonly/venv/bin/fastmcp \
   run /path/to/mcp-socrata-readonly/main.py
-```
 ```
 
 ### 2. Standalone Mode (SSE / HTTP)
