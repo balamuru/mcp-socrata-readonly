@@ -282,9 +282,9 @@ All comparable data sourced from **{county_display} CAD** official certified app
 
 
 @mcp.tool()
-def search_properties(address: Optional[str] = None, owner: Optional[str] = None, zip_code: Optional[str] = None, limit: int = 10, county: str = "collin") -> str:
+def search_properties(address: Optional[str] = None, owner: Optional[str] = None, zip_code: Optional[str] = None, subdivision: Optional[str] = None, neighborhood_code: Optional[str] = None, limit: int = 10, county: str = "collin") -> str:
     """
-    Search for real estate properties by address, owner name, or zip code.
+    Search for real estate properties by address, owner name, zip code, subdivision, or neighborhood code.
     Returns JSON formatted properties with resolved neighborhood and taxing entities.
     """
     reg = get_registry(county)
@@ -300,9 +300,14 @@ def search_properties(address: Optional[str] = None, owner: Optional[str] = None
         where_clauses.append(_build_owner_where(owner))
     if zip_code:
         where_clauses.append(f"situszip = '{_sanitize(zip_code)}'")
+    if subdivision:
+        subdiv_pattern = _sanitize(subdivision.lower()).replace("*", "%")
+        where_clauses.append(f"lower(legalabssubname) like '%{subdiv_pattern}%'")
+    if neighborhood_code:
+        where_clauses.append(f"nbhdcode = '{_sanitize(neighborhood_code)}'")
 
     if not where_clauses:
-        return json.dumps({"error": "Must provide at least one search parameter (address, owner, or zip_code)."})
+        return json.dumps({"error": "Must provide at least one search parameter (address, owner, zip_code, subdivision, or neighborhood_code)."})
 
     where_query = " AND ".join(where_clauses)
 
