@@ -50,13 +50,19 @@ Unlike generic Socrata MCP servers or direct REST API integrations, this server 
 
 ## ⚙️ Configuration
 
-The server is configured using environment variables. You can specify these variables in one of two ways:
+The server requires configuration via environment variables. How you provide these variables depends **entirely** on which Usage Mode you are using.
 
-1. **MCP Client Config File (`config.json` / `claude_desktop_config.json`)**: **Required for Embedded Mode** (e.g., Claude Desktop, Cursor). Because these host clients spawn the MCP server subprocess from arbitrary system or home working directories, the server's automatic `.env` loader will not locate a project-root `.env` file. Specifying configuration variables directly in the JSON's `env` section ensures they are passed correctly.
-2. **Local `.env` File**: **Recommended for Standalone Mode (SSE) and Development**. When running the server from the project directory, you can copy the template provided to create a local `.env` file:
-   ```bash
-   cp env.template .env
-   ```
+### 1. Embedded Mode (STDIO)
+**Do NOT use a `.env` file.** AI clients (like Claude Desktop, Antigravity IDE, Cursor) spawn the MCP server from arbitrary system directories, meaning a local `.env` file in the project root often won't be found. 
+Instead, you **must** pass environment variables directly in the client's configuration JSON using the `"env"` block.
+
+### 2. Standalone (SSE) & Development Mode
+**Use a `.env` file.** Because you are manually running the server from within the project's root directory, the server will automatically find and load variables from a local `.env` file. 
+
+To set this up, copy the provided template:
+```bash
+cp env.template .env
+```
 
 ### Configuration Variables
 
