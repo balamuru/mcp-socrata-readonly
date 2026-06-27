@@ -7,6 +7,8 @@ tags: ["MCP", "AI", "Open Data", "Real Estate", "Socrata"]
 
 # Supercharging AI with Real Estate Open Data: Building a Smarter MCP Server
 
+![AI Real Estate Data Header](assets/ai_real_estate_header.png)
+
 Open data portals are goldmines of civic and municipal information. Portals powered by platforms like Socrata host everything from property tax appraisals to crime statistics. For AI assistants and autonomous agents, this data is incredibly valuable. 
 
 But there’s a catch: **Open data APIs are notoriously hostile to LLMs.**
