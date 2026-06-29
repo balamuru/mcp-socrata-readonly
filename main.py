@@ -282,12 +282,13 @@ All comparable data sourced from **{county_display} CAD** official certified app
 
 
 @mcp.tool()
-def search_properties(address: Optional[str] = None, owner: Optional[str] = None, zip_code: Optional[str] = None, subdivision: Optional[str] = None, neighborhood_code: Optional[str] = None, limit: int = 10, county: str = "collin") -> str:
+def search_properties(address: Optional[str] = None, owner: Optional[str] = None, zip_code: Optional[str] = None, subdivision: Optional[str] = None, neighborhood_code: Optional[str] = None, limit: int = 10, county: str = "collin", year: Optional[str] = None) -> str:
     """
     Search for real estate properties by address, owner name, zip code, subdivision, or neighborhood code.
     Returns JSON formatted properties with resolved neighborhood and taxing entities.
+    Pass an optional year (e.g. "2024", "2025", "2026") to query historical or current rolls.
     """
-    reg = get_registry(county)
+    reg = get_registry(county, year)
     domain = reg["domain"]
     _ensure_cache(domain, reg)
 
@@ -319,11 +320,11 @@ def search_properties(address: Optional[str] = None, owner: Optional[str] = None
         return json.dumps({"error": str(e)})
 
 @mcp.tool()
-def get_property_detail(property_id: str, county: str = "collin") -> str:
+def get_property_detail(property_id: str, county: str = "collin", year: Optional[str] = None) -> str:
     """
-    Retrieve deep details for a specific property using its unique Property ID (propid).
+    Retrieve deep details for a specific property using its unique Property ID (propid) and optional tax year.
     """
-    reg = get_registry(county)
+    reg = get_registry(county, year)
     domain = reg["domain"]
     _ensure_cache(domain, reg)
     
@@ -338,12 +339,12 @@ def get_property_detail(property_id: str, county: str = "collin") -> str:
         return json.dumps({"error": str(e)})
 
 @mcp.tool()
-def query_properties_near(address: str, radius_miles: float = 1.0, limit: int = 10, county: str = "collin") -> str:
+def query_properties_near(address: str, radius_miles: float = 1.0, limit: int = 10, county: str = "collin", year: Optional[str] = None) -> str:
     """
     Search for properties within a specific radius of a given address.
     Uses geocoding to resolve the target address to latitude/longitude, then performs a geospatial search.
     """
-    reg = get_registry(county)
+    reg = get_registry(county, year)
     domain = reg["domain"]
     _ensure_cache(domain, reg)
     
@@ -398,7 +399,7 @@ def list_supported_locations(state: Optional[str] = None, county: Optional[str] 
         return json.dumps({"error": str(e)})
 
 @mcp.tool()
-def comp_investigator(property_id: str, county: str = "collin", size_tolerance_pct: int = 20) -> str:
+def comp_investigator(property_id: str, county: str = "collin", size_tolerance_pct: int = 20, year: Optional[str] = None) -> str:
     """
     Investigate whether a property's appraisal increase is consistent with comparable
     properties in the same neighborhood. If the increase is a statistical outlier,
@@ -417,7 +418,7 @@ def comp_investigator(property_id: str, county: str = "collin", size_tolerance_p
       analysis, state-appropriate legal framing, and a requested relief amount
     """
     try:
-        reg = get_registry(county)
+        reg = get_registry(county, year)
         domain = reg["domain"]
         dataset_id = reg["appraisal_dataset"]
         state = reg.get("state", "")
