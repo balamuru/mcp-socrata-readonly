@@ -1,9 +1,12 @@
+import os
 import sqlite3
 import time
 from typing import List, Dict, Any, Callable
 from config import logger, CACHE_TTL_DAYS
 
-DB_PATH = "socrata_cache.db"
+_CACHE_DIR = os.path.expanduser("~/.cache/mcp-socrata-readonly")
+os.makedirs(_CACHE_DIR, exist_ok=True)
+DB_PATH = os.path.join(_CACHE_DIR, "socrata_cache.db")
 
 def get_connection() -> sqlite3.Connection:
     """Get a connection to the SQLite cache database."""
