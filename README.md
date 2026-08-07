@@ -213,6 +213,38 @@ A complete suite of integration tests is located in the `tests/` directory. You 
 venv/bin/python -m unittest discover -s tests
 ```
 
+### Tool-Use Evals
+
+`evals/` contains an LLM-driven eval harness, separate from the unit tests above. It spawns the real MCP server over stdio, connects a real MCP client session, and drives Claude through actual tool-use turns against the live tool schemas — checking that Claude picks the right tool for a given natural-language request and that the call doesn't error, rather than asserting exact data values (which change over time).
+
+**Setup:** add `ANTHROPIC_API_KEY=sk-ant-...` to your `.env` file (already gitignored), or export it in your shell.
+
+```bash
+venv/bin/pip install -r evals/requirements-eval.txt
+venv/bin/python evals/run_evals.py
+
+# Run a single case
+venv/bin/python evals/run_evals.py --case search_by_address
+```
+
+#### Eval Cases
+
+Cases live in `evals/dataset.py`. Each one grades whether Claude calls the *expected* tool(s), avoids any *forbidden* tool(s), and — unless the case explicitly allows it — doesn't get back a tool response containing an `"error"` key.
+
+| Case | Prompt | Expected tool | What it checks |
+|---|---|---|---|
+| `list_states_no_args` | "What US states does this server currently support data for?" | `list_supported_locations` | Calls the location tool with no args for the top-level state listing |
+| `list_counties_in_state` | "Which counties in Texas (TX) are supported?" | `list_supported_locations` | Drills down with `state="TX"` instead of guessing |
+| `list_cities_in_county` | "List the cities and zip codes covered within Collin County." | `list_supported_locations` | Drills down further with `county="collin"` |
+| `discover_datasets` | "What Socrata datasets are available for Collin county?" | `discover_county_datasets` | Distinguishes "which datasets exist" from "which locations are supported" |
+| `search_by_address` | "Search for up to 3 properties on ELDORADO in Collin county." | `search_properties` | Maps a street-name search + limit into the right params |
+| `search_by_owner_and_zip` | "Find properties in Collin county owned by someone with last name SMITH in zip code 75002." | `search_properties` | Combines two filters (`owner` + `zip_code`) in one call |
+| `query_near_unsupported` | "Find properties within 2 miles of '123 Main St, Plano, TX'." | `query_properties_near` | Still calls the right tool even though it's known to return a graceful "unavailable" response (`must_not_error=False`) |
+| `comp_investigator_real_property` | "Run a comp investigation on property id {property_id}…" | `comp_investigator` | Uses a `setup` hook that calls `search_properties` directly to fetch a real `propid` first, so the case runs against live data |
+| `no_tool_for_smalltalk` | "Hi, what can you help me with?" | *(none)* | Negative case — Claude should not call any data-fetching tool just to answer small talk |
+
+`refresh_cache` and `get_property_detail` aren't covered by a dedicated case yet (the former is destructive/slow to run in a default suite; the latter could reuse the same dynamic-`propid` pattern as `comp_investigator_real_property`).
+
 ---
 
 ## 📦 Packaging & Distribution
